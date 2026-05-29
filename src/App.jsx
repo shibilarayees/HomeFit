@@ -7,6 +7,7 @@ import { checkIsAdmin } from './admin.js'
 import LoginPage from './components/LoginPage.jsx'
 import FamilySetup from './components/FamilySetup.jsx'
 import AdminPanel from './components/AdminPanel.jsx'
+import SetPassword from './components/SetPassword.jsx'
 import {
   loadReminderSettings, saveReminderSettings, scheduleDailyReminder, cancelDailyReminder, supportsTriggers,
 } from './reminders.js'
@@ -148,6 +149,10 @@ export default function App() {
   // (only when Supabase is configured — otherwise the app runs local-only).
   if (auth.loading) {
     return <div className="auth-wrap"><div className="auth-card" style={{ textAlign: 'center' }}>Loading…</div></div>
+  }
+  // Arrived via a password-reset link → let them set a new password first.
+  if (auth.isConfigured && auth.recovery) {
+    return <SetPassword auth={auth} />
   }
   if (auth.isConfigured && !auth.user) {
     return <LoginPage auth={auth} />

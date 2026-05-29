@@ -5,6 +5,7 @@ import { supabase, isConfigured } from './supabase.js'
 export function useAuth() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(isConfigured)
+  const [recovery, setRecovery] = useState(false) // arrived via a password-reset link
 
   useEffect(() => {
     if (!isConfigured) {
@@ -15,9 +16,15 @@ export function useAuth() {
       setSession(data.session)
       setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
+
+  const updatePassword = useCallback((newPassword) => supabase.auth.updateUser({ password: newPassword }), [])
+  const clearRecovery = useCallback(() => setRecovery(false), [])
 
   const signIn = useCallback(
     (email, password) => supabase.auth.signInWithPassword({ email: email.trim(), password }),
@@ -46,9 +53,12 @@ export function useAuth() {
     user: session?.user ?? null,
     loading,
     isConfigured,
+    recovery,
     signIn,
     signUp,
     signOut,
     resetPassword,
+    updatePassword,
+    clearRecovery,
   }
 }
