@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore, todayKey } from './store/useStore.js'
 import { useAuth } from './auth.js'
+import { useFamily, fetchFamilyMembers } from './family.js'
 import { quoteOfTheDay } from './data/quotes.js'
 import LoginPage from './components/LoginPage.jsx'
+import FamilySetup from './components/FamilySetup.jsx'
 import {
   loadReminderSettings, saveReminderSettings, scheduleDailyReminder, cancelDailyReminder, supportsTriggers,
 } from './reminders.js'
@@ -31,9 +33,23 @@ const FAMILY = 'family'
 
 const initials = (name) => name.trim().slice(0, 2).toUpperCase()
 
+// Best available on-device data to seed a newly created family (from the
+// previous per-user or local-only storage), so existing data isn't lost.
+function localSeed(userId) {
+  for (const k of [`homefit:v1:${userId}`, 'homefit:v1']) {
+    try {
+      const d = JSON.parse(localStorage.getItem(k) || 'null')
+      if (d?.members?.length) return d
+    } catch { /* ignore */ }
+  }
+  return { members: [], logs: {} }
+}
+
 export default function App() {
   const auth = useAuth()
-  const store = useStore(auth.user?.id)
+  const fam = useFamily(auth.user?.id)
+  const family = fam.family
+  const store = useStore(family?.id)
   const { members } = store
   const [activeId, setActiveId] = useState(FAMILY)
   const [tab, setTab] = useState('home')
@@ -42,8 +58,24 @@ export default function App() {
   const [reminderOpen, setReminderOpen] = useState(false)
   const [reminders, setReminders] = useState(loadReminderSettings)
   const [reminderMode, setReminderMode] = useState('')
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [famMembers, setFamMembers] = useState([])
+  const [copied, setCopied] = useState(false)
 
   const quote = useMemo(() => quoteOfTheDay(), [])
+
+  // Load the list of accounts in the family when the invite panel opens.
+  useEffect(() => {
+    if (inviteOpen && family?.id) fetchFamilyMembers(family.id).then(setFamMembers)
+  }, [inviteOpen, family?.id])
+
+  function copyCode() {
+    if (!family?.invite_code) return
+    navigator.clipboard?.writeText(family.invite_code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
 
   // Re-arm reminders on load if previously enabled.
   useEffect(() => {
@@ -108,6 +140,20 @@ export default function App() {
   if (auth.isConfigured && !auth.user) {
     return <LoginPage auth={auth} />
   }
+  // Logged in but not yet in a family → create/join screen.
+  if (auth.isConfigured && auth.user && fam.loading) {
+    return <div className="auth-wrap"><div className="auth-card" style={{ textAlign: 'center' }}>Loading your family…</div></div>
+  }
+  if (auth.isConfigured && auth.user && !family) {
+    return (
+      <FamilySetup
+        email={auth.user.email}
+        initialData={localSeed(auth.user.id)}
+        onReady={(f) => fam.setFamily(f)}
+        onSignOut={() => auth.signOut()}
+      />
+    )
+  }
 
   const syncLabel = { loading: '☁️ syncing…', synced: '☁️ synced', offline: '⚠️ offline', idle: '' }[store.syncStatus]
 
@@ -122,6 +168,11 @@ export default function App() {
           </div>
         </div>
         <div className="row" style={{ gap: 8 }}>
+          {family && (
+            <button className="btn ghost sm" onClick={() => setInviteOpen(true)} title="Family & invite code">
+              👨‍👩‍👧 {family.name}
+            </button>
+          )}
           {auth.isConfigured && syncLabel && <span className="sync-badge" title={auth.user?.email}>{syncLabel}</span>}
           <button className="btn ghost sm" onClick={() => setReminderOpen(true)} title="Daily reminders">
             {reminders.enabled ? `🔔 ${reminders.time}` : '🔕 Reminders'}
@@ -214,7 +265,7 @@ export default function App() {
       <p className="disclaimer">
         ⚠️ HomeFit gives general estimates based on public dietary guidelines, not medical advice.
         Calorie and water targets — especially for children — should be confirmed with a doctor or
-        registered dietitian. All data is stored only on this device.
+        registered dietitian. Your data is saved privately to your family account.
       </p>
 
       {formOpen && (
@@ -254,8 +305,35 @@ export default function App() {
             <p className="disclaimer" style={{ marginTop: 14 }}>
               {supportsTriggers()
                 ? '✅ Your browser supports scheduled notifications — reminders can fire even when HomeFit is closed (install it to your home screen for best results).'
-                : 'ℹ️ Your browser fires reminders while HomeFit is open in a tab or installed. Guaranteed delivery when fully closed needs a push server, which this local-only app does not use.'}
+                : 'ℹ️ Your browser fires reminders while HomeFit is open in a tab or installed. Guaranteed delivery when fully closed would need a push server, which this app does not use yet.'}
             </p>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && family && (
+        <div className="overlay" onClick={() => setInviteOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>👨‍👩‍👧 {family.name}</h2>
+            <p className="sub" style={{ marginTop: -6 }}>
+              Share this invite code so the rest of your family can join and track together.
+            </p>
+            <div className="invite-code" onClick={copyCode} title="Tap to copy">
+              <span>{family.invite_code}</span>
+              <button className="btn sm">{copied ? '✓ Copied' : 'Copy'}</button>
+            </div>
+            <h3 style={{ marginBottom: 6 }}>Members ({famMembers.length})</h3>
+            <div className="list">
+              {famMembers.map((m, i) => (
+                <div className="list-item" key={i}>
+                  <span>{m.email || 'member'}</span>
+                  {m.role === 'owner' && <span className="badge">owner</span>}
+                </div>
+              ))}
+            </div>
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn ghost" onClick={() => setInviteOpen(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}

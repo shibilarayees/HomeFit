@@ -6,12 +6,12 @@ import { supabase } from '../supabase.js'
 //   logs: { [memberId]: { [yyyy-mm-dd]: { food: [{name,kcal}], waterMl, weightKg } } } }
 
 const EMPTY = { members: [], logs: {} }
-// Cache key is namespaced per user so multiple accounts on one browser stay separate.
-const cacheKey = (userId) => `homefit:v1:${userId || 'local'}`
+// Cache key is namespaced per family so multiple families on one browser stay separate.
+const cacheKey = (familyId) => `homefit:v1:fam:${familyId || 'local'}`
 
-function load(userId) {
+function load(familyId) {
   try {
-    const raw = localStorage.getItem(cacheKey(userId))
+    const raw = localStorage.getItem(cacheKey(familyId))
     if (raw) return JSON.parse(raw)
   } catch (e) {
     console.warn('Could not read HomeFit data', e)
@@ -19,9 +19,9 @@ function load(userId) {
   return { ...EMPTY }
 }
 
-function save(userId, state) {
+function save(familyId, state) {
   try {
-    localStorage.setItem(cacheKey(userId), JSON.stringify(state))
+    localStorage.setItem(cacheKey(familyId), JSON.stringify(state))
   } catch (e) {
     console.warn('Could not save HomeFit data', e)
   }
@@ -37,29 +37,29 @@ function newId() {
   return `m${Date.now().toString(36)}${_id}`
 }
 
-// `userId` (from Supabase auth) enables cloud sync; without it the store is
-// local-only. The localStorage cache makes the app work offline either way.
-export function useStore(userId) {
-  const [state, setState] = useState(() => load(userId))
+// `familyId` (from the user's family) keys the shared cloud dataset. The
+// localStorage cache makes the app work offline. Without a familyId the store
+// is local-only.
+export function useStore(familyId) {
+  const [state, setState] = useState(() => load(familyId))
   const [syncStatus, setSyncStatus] = useState('idle') // idle | loading | synced | offline
-  const hydratedFor = useRef(null)
+  const lastWritten = useRef(null) // ignore realtime echoes of our own writes
 
-  // Switch cache when the user changes (login/logout).
+  // Switch cache when the family changes.
   useEffect(() => {
-    setState(load(userId))
-    hydratedFor.current = null
-  }, [userId])
+    setState(load(familyId))
+  }, [familyId])
 
-  // On login, pull the user's row from Supabase (and seed it if missing).
+  // Pull the family's shared row from Supabase.
   useEffect(() => {
-    if (!userId || !supabase) return
+    if (!familyId || !supabase) return
     let active = true
     setSyncStatus('loading')
     ;(async () => {
       const { data, error } = await supabase
-        .from('homefit_state')
+        .from('family_state')
         .select('data')
-        .eq('user_id', userId)
+        .eq('family_id', familyId)
         .maybeSingle()
       if (!active) return
       if (error) {
@@ -67,43 +67,50 @@ export function useStore(userId) {
         return
       }
       if (data?.data) {
+        lastWritten.current = JSON.stringify(data.data)
         setState(data.data)
-        save(userId, data.data)
-      } else {
-        // No cloud row yet: seed it from this user's cache, or migrate legacy
-        // local-only data (pre-accounts key) on first login so nothing is lost.
-        let seed = load(userId)
-        if (!seed.members?.length) {
-          try {
-            const legacy = JSON.parse(localStorage.getItem('homefit:v1') || 'null')
-            if (legacy?.members?.length) {
-              seed = legacy
-              localStorage.removeItem('homefit:v1') // consume so it can't seed another account
-            }
-          } catch { /* ignore */ }
-        }
-        setState(seed)
-        save(userId, seed)
-        await supabase.from('homefit_state').upsert({ user_id: userId, data: seed, updated_at: new Date().toISOString() })
+        save(familyId, data.data)
       }
-      hydratedFor.current = userId
       setSyncStatus('synced')
     })()
     return () => { active = false }
-  }, [userId])
+  }, [familyId])
+
+  // Live updates: when another family member changes the shared data, adopt it.
+  useEffect(() => {
+    if (!familyId || !supabase) return
+    const channel = supabase
+      .channel(`family_state:${familyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'family_state', filter: `family_id=eq.${familyId}` },
+        (payload) => {
+          const incoming = payload.new?.data
+          if (!incoming) return
+          const str = JSON.stringify(incoming)
+          if (str === lastWritten.current) return // our own echo
+          lastWritten.current = str
+          setState(incoming)
+          save(familyId, incoming)
+        },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [familyId])
 
   // Persist on every change: cache immediately, push to cloud (debounced).
   useEffect(() => {
-    save(userId, state)
-    if (!userId || !supabase) return
+    save(familyId, state)
+    if (!familyId || !supabase) return
     const t = setTimeout(async () => {
+      lastWritten.current = JSON.stringify(state)
       const { error } = await supabase
-        .from('homefit_state')
-        .upsert({ user_id: userId, data: state, updated_at: new Date().toISOString() })
+        .from('family_state')
+        .upsert({ family_id: familyId, data: state, updated_at: new Date().toISOString() })
       setSyncStatus(error ? 'offline' : 'synced')
     }, 700)
     return () => clearTimeout(t)
-  }, [state, userId])
+  }, [state, familyId])
 
   const addMember = useCallback((m) => {
     const member = { id: newId(), ...m }
