@@ -348,6 +348,9 @@ export default function App() {
                 </div>
               ))}
             </div>
+            <p className="sub" style={{ marginTop: 12 }}>
+              🔒 Only people with this code can join your family. Other families can’t see your data.
+            </p>
             <div className="row" style={{ marginTop: 14 }}>
               <button className="btn ghost" onClick={() => setInviteOpen(false)}>Close</button>
             </div>

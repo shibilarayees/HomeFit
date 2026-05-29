@@ -74,6 +74,10 @@ export default function FamilySetup({ email, initialData, onReady, onSignOut }) 
 
         {err && <div className="sub" style={{ marginTop: 10, color: 'var(--red)' }}>⚠️ {err}</div>}
 
+        <p className="sub" style={{ marginTop: 14, textAlign: 'center' }}>
+          🔒 Your family’s data is private — other families can’t see it.
+        </p>
+
         <button className="link-btn" onClick={onSignOut} style={{ display: 'block', margin: '14px auto 0' }}>
           Sign out
         </button>
