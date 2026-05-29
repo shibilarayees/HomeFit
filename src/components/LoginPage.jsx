@@ -93,7 +93,7 @@ export default function LoginPage({ auth }) {
         </div>
 
         <p className="sub" style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
-          Forgot your password? Contact the person who shared HomeFit with you to get it reset.
+          Forgot your password? Contact the admin to reset it.
         </p>
 
         <p className="sub" style={{ marginTop: 12, fontStyle: 'italic', textAlign: 'center' }}>
