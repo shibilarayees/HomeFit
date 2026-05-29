@@ -130,8 +130,13 @@ input, select { font-family: inherit; }
 .badge.kid { background: #7c3aed; color: #f3e8ff; }
 
 /* Modal */
-.overlay { position: fixed; inset: 0; background: #0009; display: grid; place-items: center; padding: 16px; z-index: 50; }
-.modal { background: var(--panel); border: 1px solid #2a3a52; border-radius: var(--radius); padding: 20px; width: 100%; max-width: 460px; }
+.overlay { position: fixed; inset: 0; background: #0009; display: grid; place-items: center; padding: 16px; z-index: 50; overflow-y: auto; }
+.modal {
+  background: var(--panel); border: 1px solid #2a3a52; border-radius: var(--radius);
+  padding: 20px; width: 100%; max-width: 460px;
+  max-height: 90vh; max-height: 90dvh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .modal h2 { margin: 0 0 14px; }
 
 /* Auth / login */
