@@ -1,24 +1,27 @@
-import { useEffect, useState, useCallback } from 'react'
-
-const KEY = 'homefit:v1'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { supabase } from '../supabase.js'
 
 // Shape:
 // { members: [ {id, name, sex, age, heightCm, weightKg, activity, goal, goalWeightKg} ],
 //   logs: { [memberId]: { [yyyy-mm-dd]: { food: [{name,kcal}], waterMl, weightKg } } } }
 
-function load() {
+const EMPTY = { members: [], logs: {} }
+// Cache key is namespaced per user so multiple accounts on one browser stay separate.
+const cacheKey = (userId) => `homefit:v1:${userId || 'local'}`
+
+function load(userId) {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(cacheKey(userId))
     if (raw) return JSON.parse(raw)
   } catch (e) {
     console.warn('Could not read HomeFit data', e)
   }
-  return { members: [], logs: {} }
+  return { ...EMPTY }
 }
 
-function save(state) {
+function save(userId, state) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state))
+    localStorage.setItem(cacheKey(userId), JSON.stringify(state))
   } catch (e) {
     console.warn('Could not save HomeFit data', e)
   }
@@ -34,10 +37,73 @@ function newId() {
   return `m${Date.now().toString(36)}${_id}`
 }
 
-export function useStore() {
-  const [state, setState] = useState(load)
+// `userId` (from Supabase auth) enables cloud sync; without it the store is
+// local-only. The localStorage cache makes the app work offline either way.
+export function useStore(userId) {
+  const [state, setState] = useState(() => load(userId))
+  const [syncStatus, setSyncStatus] = useState('idle') // idle | loading | synced | offline
+  const hydratedFor = useRef(null)
 
-  useEffect(() => save(state), [state])
+  // Switch cache when the user changes (login/logout).
+  useEffect(() => {
+    setState(load(userId))
+    hydratedFor.current = null
+  }, [userId])
+
+  // On login, pull the user's row from Supabase (and seed it if missing).
+  useEffect(() => {
+    if (!userId || !supabase) return
+    let active = true
+    setSyncStatus('loading')
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('homefit_state')
+        .select('data')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (!active) return
+      if (error) {
+        setSyncStatus('offline')
+        return
+      }
+      if (data?.data) {
+        setState(data.data)
+        save(userId, data.data)
+      } else {
+        // No cloud row yet: seed it from this user's cache, or migrate legacy
+        // local-only data (pre-accounts key) on first login so nothing is lost.
+        let seed = load(userId)
+        if (!seed.members?.length) {
+          try {
+            const legacy = JSON.parse(localStorage.getItem('homefit:v1') || 'null')
+            if (legacy?.members?.length) {
+              seed = legacy
+              localStorage.removeItem('homefit:v1') // consume so it can't seed another account
+            }
+          } catch { /* ignore */ }
+        }
+        setState(seed)
+        save(userId, seed)
+        await supabase.from('homefit_state').upsert({ user_id: userId, data: seed, updated_at: new Date().toISOString() })
+      }
+      hydratedFor.current = userId
+      setSyncStatus('synced')
+    })()
+    return () => { active = false }
+  }, [userId])
+
+  // Persist on every change: cache immediately, push to cloud (debounced).
+  useEffect(() => {
+    save(userId, state)
+    if (!userId || !supabase) return
+    const t = setTimeout(async () => {
+      const { error } = await supabase
+        .from('homefit_state')
+        .upsert({ user_id: userId, data: state, updated_at: new Date().toISOString() })
+      setSyncStatus(error ? 'offline' : 'synced')
+    }, 700)
+    return () => clearTimeout(t)
+  }, [state, userId])
 
   const addMember = useCallback((m) => {
     const member = { id: newId(), ...m }
@@ -170,5 +236,6 @@ export function useStore() {
     weightHistory,
     exportData,
     importData,
+    syncStatus,
   }
 }

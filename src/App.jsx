@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore, todayKey } from './store/useStore.js'
+import { useAuth } from './auth.js'
 import { quoteOfTheDay } from './data/quotes.js'
+import LoginPage from './components/LoginPage.jsx'
 import {
   loadReminderSettings, saveReminderSettings, scheduleDailyReminder, cancelDailyReminder, supportsTriggers,
 } from './reminders.js'
@@ -30,7 +32,8 @@ const FAMILY = 'family'
 const initials = (name) => name.trim().slice(0, 2).toUpperCase()
 
 export default function App() {
-  const store = useStore()
+  const auth = useAuth()
+  const store = useStore(auth.user?.id)
   const { members } = store
   const [activeId, setActiveId] = useState(FAMILY)
   const [tab, setTab] = useState('home')
@@ -97,6 +100,17 @@ export default function App() {
     }
   }
 
+  // Auth gating: show a splash while resolving, and the login page when signed out
+  // (only when Supabase is configured — otherwise the app runs local-only).
+  if (auth.loading) {
+    return <div className="auth-wrap"><div className="auth-card" style={{ textAlign: 'center' }}>Loading…</div></div>
+  }
+  if (auth.isConfigured && !auth.user) {
+    return <LoginPage auth={auth} />
+  }
+
+  const syncLabel = { loading: '☁️ syncing…', synced: '☁️ synced', offline: '⚠️ offline', idle: '' }[store.syncStatus]
+
   return (
     <div className="app">
       <div className="topbar">
@@ -107,9 +121,17 @@ export default function App() {
             <small>Family health, tracked together</small>
           </div>
         </div>
-        <button className="btn ghost sm" onClick={() => setReminderOpen(true)} title="Daily reminders">
-          {reminders.enabled ? `🔔 ${reminders.time}` : '🔕 Reminders'}
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          {auth.isConfigured && syncLabel && <span className="sync-badge" title={auth.user?.email}>{syncLabel}</span>}
+          <button className="btn ghost sm" onClick={() => setReminderOpen(true)} title="Daily reminders">
+            {reminders.enabled ? `🔔 ${reminders.time}` : '🔕 Reminders'}
+          </button>
+          {auth.isConfigured && (
+            <button className="btn ghost sm" onClick={() => auth.signOut()} title={`Sign out ${auth.user?.email || ''}`}>
+              Sign out
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="quote">
