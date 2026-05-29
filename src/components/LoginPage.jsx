@@ -92,7 +92,11 @@ export default function LoginPage({ auth }) {
           <span>🔒 Your data is private to your family — other families can’t see it — and syncs across your devices.</span>
         </div>
 
-        <p className="sub" style={{ marginTop: 14, fontStyle: 'italic', textAlign: 'center' }}>
+        <p className="sub" style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
+          Forgot your password? Contact the person who shared HomeFit with you to get it reset.
+        </p>
+
+        <p className="sub" style={{ marginTop: 12, fontStyle: 'italic', textAlign: 'center' }}>
           “{quote.text}”
         </p>
       </div>
