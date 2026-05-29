@@ -3,8 +3,10 @@ import { useStore, todayKey } from './store/useStore.js'
 import { useAuth } from './auth.js'
 import { useFamily, fetchFamilyMembers } from './family.js'
 import { quoteOfTheDay } from './data/quotes.js'
+import { checkIsAdmin } from './admin.js'
 import LoginPage from './components/LoginPage.jsx'
 import FamilySetup from './components/FamilySetup.jsx'
+import AdminPanel from './components/AdminPanel.jsx'
 import {
   loadReminderSettings, saveReminderSettings, scheduleDailyReminder, cancelDailyReminder, supportsTriggers,
 } from './reminders.js'
@@ -61,8 +63,18 @@ export default function App() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [famMembers, setFamMembers] = useState([])
   const [copied, setCopied] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
 
   const quote = useMemo(() => quoteOfTheDay(), [])
+
+  // Is this account an app admin? (controls the 📊 Admin button)
+  useEffect(() => {
+    let on = true
+    if (auth.user) checkIsAdmin().then((v) => { if (on) setIsAdmin(v) })
+    else setIsAdmin(false)
+    return () => { on = false }
+  }, [auth.user])
 
   // Load the list of accounts in the family when the invite panel opens.
   useEffect(() => {
@@ -171,6 +183,11 @@ export default function App() {
           {family && (
             <button className="btn ghost sm" onClick={() => setInviteOpen(true)} title="Family & invite code">
               👨‍👩‍👧 {family.name}
+            </button>
+          )}
+          {isAdmin && (
+            <button className="btn ghost sm" onClick={() => setAdminOpen(true)} title="App admin overview">
+              📊 Admin
             </button>
           )}
           {auth.isConfigured && syncLabel && <span className="sync-badge" title={auth.user?.email}>{syncLabel}</span>}
@@ -337,6 +354,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
     </div>
   )
 }

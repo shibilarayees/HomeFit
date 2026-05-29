@@ -138,6 +138,7 @@ input, select { font-family: inherit; }
   -webkit-overflow-scrolling: touch;
 }
 .modal h2 { margin: 0 0 14px; }
+.admin-modal { max-width: 600px; }
 
 /* Auth / login */
 .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
