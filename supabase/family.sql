@@ -7,7 +7,7 @@ create table if not exists public.families (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   invite_code text not null unique,
-  created_by  uuid references auth.users (id),
+  created_by  uuid references auth.users (id) on delete set null,
   created_at  timestamptz not null default now()
 );
 

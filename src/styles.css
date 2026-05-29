@@ -150,6 +150,14 @@ input, select { font-family: inherit; }
 }
 .auth-tabs button.active { background: var(--green-d); color: #fff; }
 .link-btn { background: none; border: none; color: var(--blue); font-size: 13px; margin-top: 10px; padding: 0; }
+.how-it-works {
+  margin-top: 16px; padding: 12px 14px; background: #0f1d33;
+  border: 1px solid #25344b; border-radius: 12px; font-size: 13px;
+}
+.how-it-works > b { display: block; margin-bottom: 6px; color: var(--text); }
+.how-it-works ol { margin: 0 0 8px; padding-left: 18px; color: var(--muted); line-height: 1.55; }
+.how-it-works ol b { color: var(--text); }
+.how-it-works > span { color: var(--muted); font-size: 12px; }
 .sync-badge { font-size: 12px; color: var(--muted); align-self: center; white-space: nowrap; }
 
 /* Invite code block */

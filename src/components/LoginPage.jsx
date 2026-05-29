@@ -92,7 +92,17 @@ export default function LoginPage({ auth }) {
           </div>
         )}
 
-        <p className="sub" style={{ marginTop: 16, fontStyle: 'italic', textAlign: 'center' }}>
+        <div className="how-it-works">
+          <b>New here? How it works</b>
+          <ol>
+            <li><b>Create an account</b> above (email + password).</li>
+            <li><b>Start a family</b> — you’ll get a short invite code to share, or <b>join</b> your family with a code someone gave you.</li>
+            <li>Add each family member and start tracking — everyone in your family shares the same view.</li>
+          </ol>
+          <span>Your data is private to your family and synced across your devices.</span>
+        </div>
+
+        <p className="sub" style={{ marginTop: 14, fontStyle: 'italic', textAlign: 'center' }}>
           “{quote.text}”
         </p>
       </div>
