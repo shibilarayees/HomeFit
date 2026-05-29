@@ -49,12 +49,6 @@ export default function LoginPage({ auth }) {
     // On success with a session, the auth listener swaps to the app automatically.
   }
 
-  async function forgot() {
-    if (!email.trim()) { setMsg({ ok: false, text: 'Enter your email first, then tap “Forgot password”.' }); return }
-    const { error } = await auth.resetPassword(email)
-    setMsg(error ? { ok: false, text: error.message } : { ok: true, text: '📧 Password reset link sent (if the email exists).' })
-  }
-
   return (
     <div className="auth-wrap">
       <div className="auth-card">
@@ -81,10 +75,6 @@ export default function LoginPage({ auth }) {
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </button>
         </form>
-
-        {mode === 'signin' && (
-          <button className="link-btn" onClick={forgot}>Forgot password?</button>
-        )}
 
         {msg && (
           <div className="sub" style={{ marginTop: 10, color: msg.ok ? 'var(--green)' : 'var(--red)' }}>
